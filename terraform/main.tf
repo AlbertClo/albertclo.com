@@ -11,16 +11,20 @@ provider "aws" {
     region = "us-east-1"
 }
 
-data "aws_ssm_parameter" "amzn2_ami" {
-    name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+locals {
+    common_tags = {
+        Project     = "albertclo.com"
+        Environment = "Production"
+        ManagedBy   = "Terraform"
+    }
 }
 
 resource "aws_internet_gateway" "albertclo_igw" {
     vpc_id = aws_vpc.albertclo_vpc.id
 
-    tags = {
+    tags = merge(local.common_tags, {
         Name = "albertclo-igw"
-    }
+    })
 }
 
 resource "aws_route_table" "public" {
@@ -31,9 +35,9 @@ resource "aws_route_table" "public" {
         gateway_id = aws_internet_gateway.albertclo_igw.id
     }
 
-    tags = {
+    tags = merge(local.common_tags, {
         Name = "albertclo-public-rt"
-    }
+    })
 }
 
 resource "aws_route_table_association" "public" {
@@ -44,9 +48,9 @@ resource "aws_route_table_association" "public" {
 resource "aws_vpc" "albertclo_vpc" {
     cidr_block = "10.0.0.0/16"
 
-    tags = {
+    tags = merge(local.common_tags, {
         Name = "albertclo-vpc"
-    }
+    })
 }
 
 resource "aws_subnet" "albertclo_subnet" {
@@ -54,14 +58,18 @@ resource "aws_subnet" "albertclo_subnet" {
     cidr_block              = "10.0.1.0/24"
     map_public_ip_on_launch = true
 
-    tags = {
+    tags = merge(local.common_tags, {
         Name = "albertclo-subnet"
-    }
+    })
 }
 
 resource "aws_key_pair" "albert_ssh_key" {
     key_name   = "albert_ssh_key"
     public_key = file("public_keys/albert_id_rsa.pub")
+
+    tags = merge(local.common_tags, {
+        Name = "albert_ssh_key"
+    })
 }
 
 resource "aws_security_group" "albertclo_com_sec_group" {
@@ -99,6 +107,14 @@ resource "aws_security_group" "albertclo_com_sec_group" {
         protocol    = "-1"
         cidr_blocks = ["0.0.0.0/0"]
     }
+
+    tags = merge(local.common_tags, {
+        Name = "albertclo-com-sec-group"
+    })
+}
+
+data "aws_ssm_parameter" "amzn2_ami" {
+    name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
 }
 
 resource "aws_instance" "albertclo_com" {
@@ -114,10 +130,10 @@ resource "aws_instance" "albertclo_com" {
     root_block_device {
         volume_type = "gp3"
         volume_size = 20  # Size in GB
-        encrypted   = false
-        tags = {
+        encrypted   = true
+        tags = merge(local.common_tags, {
             Name = "Root volume for albertclo.com"
-        }
+        })
     }
 
     user_data = <<-EOF
@@ -140,16 +156,16 @@ resource "aws_instance" "albertclo_com" {
 
                 EOF
 
-    tags = {
-        Name = "albertclo.com"
-    }
-
     lifecycle {
         # prevent_destroy = true
         ignore_changes  = [
             ami,
         ]
     }
+
+    tags = merge(local.common_tags, {
+        Name = "albertclo.com"
+    })
 }
 
 output "instance_public_ip" {
