@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+    app:
+        build:
+            args:
+                user: ${USER:-ec2-user}
+                uid: ${UID:-10002}
+            context: ./docker/services/app
+            dockerfile: Dockerfile
+        image: albertclo:app
+        container_name: albertclo-app
+        restart: unless-stopped
+        working_dir: /var/www
+        volumes:
+            - ./:/var/www
+        networks:
+            - albertclo-network
+
+    queue:
+        image: albertclo:app
+        container_name: albertclo-queue
+        restart: always
+        working_dir: /var/www/
+        command: php artisan queue:work
+        depends_on:
+            - app
+        volumes:
+            - ./:/var/www
+        networks:
+            - albertclo-network
+
+    nginx:
+        image: nginx:alpine
+        container_name: albertclo-nginx
+        restart: unless-stopped
+        ports:
+            - 80:80
+        volumes:
+            - ./:/var/www
+            - ./docker/services/nginx/conf.d:/etc/nginx/conf.d/
+        networks:
+            - albertclo-network
+
+    pgsql:
+        image: 'postgres:15'
+        ports:
+            - '${FORWARD_DB_PORT:-5432}:5432'
+        environment:
+            PGPASSWORD: '${DB_PASSWORD:-secret}'
+            POSTGRES_DB: '${DB_DATABASE}'
+            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
+        volumes:
+            - '/var/lib/albertclo/:/var/lib/postgresql/data'
+        networks:
+            - albertclo-network
+
+    redis:
+        image: redis:alpine
+        container_name: albertclo-redis
+        restart: unless-stopped
+        volumes:
+            - /var/lib/albertclo/redis:/data
+        expose:
+            - 6379
+        networks:
+            - albertclo-network
+
+networks:
+  albertclo-network:
+    driver: bridge
