@@ -22,6 +22,7 @@ jobs:
           instance-ids: ${{ secrets.INSTANCE_ID }}
 
           working-directory: /home/ec2-user
-          command: touch test3
-          comment: touch test4
-
+          command: |
+            touch test3
+            echo "Hello World" > test3
+            touch test4
