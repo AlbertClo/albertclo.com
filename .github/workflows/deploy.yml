@@ -22,9 +22,6 @@ jobs:
           instance-ids: ${{ secrets.INSTANCE_ID }}
 
           working-directory: /home/ubuntu/application
-          command: ls -al
-          comment: Hello world!
+          command: touch test3
+          comment: touch test4
 
-      # Catch SSM outputs
-      - name: Get the outputs
-        run: echo "The Command id is ${{ steps.ssm.outputs.command-id }}"

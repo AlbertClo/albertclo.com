@@ -19,6 +19,7 @@ locals {
     }
 }
 
+# Creates an Internet Gateway for the VPC to allow internet access
 resource "aws_internet_gateway" "albertclo_igw" {
     vpc_id = aws_vpc.albertclo_vpc.id
 
@@ -27,6 +28,7 @@ resource "aws_internet_gateway" "albertclo_igw" {
     })
 }
 
+# Creates a public route table for the VPC
 resource "aws_route_table" "public" {
     vpc_id = aws_vpc.albertclo_vpc.id
 
@@ -40,11 +42,13 @@ resource "aws_route_table" "public" {
     })
 }
 
+# Associates the public route table with the subnet
 resource "aws_route_table_association" "public" {
     subnet_id      = aws_subnet.albertclo_subnet.id
     route_table_id = aws_route_table.public.id
 }
 
+# Creates a VPC for the infrastructure
 resource "aws_vpc" "albertclo_vpc" {
     cidr_block = "10.0.0.0/16"
 
@@ -53,6 +57,7 @@ resource "aws_vpc" "albertclo_vpc" {
     })
 }
 
+# Creates a subnet within the VPC
 resource "aws_subnet" "albertclo_subnet" {
     vpc_id                  = aws_vpc.albertclo_vpc.id
     cidr_block              = "10.0.1.0/24"
@@ -63,6 +68,7 @@ resource "aws_subnet" "albertclo_subnet" {
     })
 }
 
+# Creates an SSH key pair for accessing EC2 instances
 resource "aws_key_pair" "albert_ssh_key" {
     key_name   = "albert_ssh_key"
     public_key = file("public_keys/albert_id_rsa.pub")
@@ -72,6 +78,7 @@ resource "aws_key_pair" "albert_ssh_key" {
     })
 }
 
+# Creates a security group to control inbound and outbound traffic
 resource "aws_security_group" "albertclo_com_sec_group" {
     name        = "albertclo_com_sec_group"
     description = "Allow inbound web and ssh traffic"
@@ -113,12 +120,15 @@ resource "aws_security_group" "albertclo_com_sec_group" {
     })
 }
 
+# Retrieves the latest Amazon Linux 2 AMI ID
 data "aws_ssm_parameter" "amzn2_ami" {
     name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
 }
 
+# Retrieves information about the current AWS region
 data "aws_region" "current" {}
 
+# Creates an EC2 instance for hosting albertclo.com
 resource "aws_instance" "albertclo_com" {
     ami           = data.aws_ssm_parameter.amzn2_ami.value
     instance_type = "t3.micro"
@@ -202,6 +212,7 @@ resource "aws_instance" "albertclo_com" {
     })
 }
 
+# Creates an IAM role for EC2 instances to access SSM
 resource "aws_iam_role" "albert_clo_ec2_ssm_role" {
     name = "albert_clo_ec2_ssm_role"
 
@@ -219,8 +230,10 @@ resource "aws_iam_role" "albert_clo_ec2_ssm_role" {
     })
 }
 
+# Retrieves information about the current AWS account
 data "aws_caller_identity" "current" {}
 
+# Attaches a policy to the EC2 role to allow access to the GitHub deploy key in SSM
 resource "aws_iam_role_policy" "ssm_albertclo_github_deploy_key" {
     name = "ssm_albertclo_github_deploy_key"
     role = aws_iam_role.albert_clo_ec2_ssm_role.id
@@ -241,11 +254,13 @@ resource "aws_iam_role_policy" "ssm_albertclo_github_deploy_key" {
     })
 }
 
+# Creates an IAM instance profile for EC2 instances
 resource "aws_iam_instance_profile" "albert_clo_ec2_profile" {
     name = "albert_clo_ec2_ec2_ssm_profile"
     role = aws_iam_role.albert_clo_ec2_ssm_role.name
 }
 
+# Generates a private key for GitHub deployment
 resource "tls_private_key" "albertclo_github_deploy_key" {
     algorithm = "RSA"
     rsa_bits  = 4096
@@ -255,6 +270,7 @@ resource "tls_private_key" "albertclo_github_deploy_key" {
     }
 }
 
+# Stores the GitHub deploy key in SSM Parameter Store
 resource "aws_ssm_parameter" "albertclo_github_deploy_key" {
     name  = "/albertclo/github_deploy_key"
     type  = "SecureString"
@@ -275,6 +291,7 @@ variable "github_repo" {
     default     = "AlbertClo/albertclo.com"
 }
 
+# Creates an IAM role for GitHub Actions to assume for deployments
 resource "aws_iam_role" "albertclo_github_actions_role" {
     name = "albertclo-github-actions-deploy-role"
 
@@ -297,6 +314,7 @@ resource "aws_iam_role" "albertclo_github_actions_role" {
     })
 }
 
+# Attaches a policy to the GitHub Actions role to allow deployments
 resource "aws_iam_role_policy" "albertclo_github_actions_policy" {
     name = "albertclo-github-actions-deploy-policy"
     role = aws_iam_role.albertclo_github_actions_role.id
@@ -341,20 +359,24 @@ resource "aws_iam_role_policy" "albertclo_github_actions_policy" {
     })
 }
 
+# Attaches the SSM Managed Instance Core policy to the EC2 role
 resource "aws_iam_role_policy_attachment" "ssm_policy" {
     policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
     role       = aws_iam_role.albert_clo_ec2_ssm_role.name
 }
 
+# Outputs the ARN of the GitHub Actions role
 output "albertclo_github_actions_role_arn" {
     value = aws_iam_role.albertclo_github_actions_role.arn
 }
 
+# Outputs the public IP address of the EC2 instance
 output "instance_public_ip" {
     description = "Public IP address of the EC2 instance"
     value       = aws_instance.albertclo_com.public_ip
 }
 
+# Outputs the public key for GitHub deployment
 output "github_public_key" {
     description = "GitHub deploy key"
     value       = tls_private_key.albertclo_github_deploy_key.public_key_openssh
