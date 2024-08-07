@@ -78,6 +78,57 @@ resource "aws_key_pair" "albert_ssh_key" {
     })
 }
 
+# Generates an IAM user and access key for GitHub Actions
+resource "aws_iam_user" "albertclo_github_actions_user" {
+    name = "albertclo-github-actions"
+
+    tags = merge(local.common_tags, {
+        Name = "albertclo-github-actions"
+    })
+}
+
+# Creates a policy to allow running SSM commands on the EC2 instance. Used for deployments with GitHub Actions.
+resource "aws_iam_policy" "albertclo_github_actions_ssm_policy" {
+    name        = "albertclo-github-actions-ssm-policy"
+    description = "Policy to allow running SSM commands on albertclo.com EC2 instance"
+
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Effect = "Allow"
+                Action = [
+                    "ssm:SendCommand",
+                    "ssm:GetCommandInvocation"
+                ]
+                Resource = [
+                    "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/${aws_instance.albertclo_com.id}",
+                    "arn:aws:ssm:*:*:document/AWS-RunShellScript"
+                ]
+            },
+            {
+                Effect = "Allow"
+                Action = [
+                    "ssm:DescribeInstanceInformation",
+                    "ec2:DescribeInstanceStatus"
+                ]
+                Resource = "*"
+            }
+        ]
+    })
+}
+
+# Attaches the SSM policy to the GitHub Actions user
+resource "aws_iam_user_policy_attachment" "albertclo_github_actions_ssm_policy_attachment" {
+    user       = aws_iam_user.albertclo_github_actions_user.name
+    policy_arn = aws_iam_policy.albertclo_github_actions_ssm_policy.arn
+}
+
+# Creates an access key for the GitHub Actions user
+resource "aws_iam_access_key" "albertclo_github_actions_access_key" {
+    user = aws_iam_user.albertclo_github_actions_user.name
+}
+
 # Creates a security group to control inbound and outbound traffic
 resource "aws_security_group" "albertclo_com_sec_group" {
     name        = "albertclo_com_sec_group"
@@ -376,8 +427,29 @@ output "instance_public_ip" {
     value       = aws_instance.albertclo_com.public_ip
 }
 
+# Outputs the AlbertClo EC2 instance ID
+output "instance_id" {
+    description = "ID of the EC2 instance"
+    value       = aws_instance.albertclo_com.id
+}
+
 # Outputs the public key for GitHub deployment
 output "github_public_key" {
     description = "GitHub deploy key"
     value       = tls_private_key.albertclo_github_deploy_key.public_key_openssh
 }
+
+# Outputs the access key for GitHub Actions
+output "github_actions_access_key" {
+    description = "Access key for GitHub Actions"
+    value       = aws_iam_access_key.albertclo_github_actions_access_key.id
+}
+
+# Outputs the secret key for GitHub Actions
+# This output is sensitive. To view this output, run `terraform output github_actions_secret_key`
+output "github_actions_secret_key" {
+    description = "Secret key for GitHub Actions"
+    value       = aws_iam_access_key.albertclo_github_actions_access_key.secret
+    sensitive   = true
+}
+
