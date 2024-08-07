@@ -6,33 +6,25 @@ on:
       - main
 
 jobs:
-  deploy:
+  start:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        role-to-assume: arn:aws:iam::905418238199:role/albertclo-github-actions-deploy-role
-        aws-region: us-east-1
-        role-session-name: GitHubActionsSession
-        audience: sts.amazonaws.com
+      - name: AWS SSM Send-Command
+        uses: peterkimzz/aws-ssm-send-command@master
+        id: ssm
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          instance-ids: ${{ secrets.INSTANCE_ID }}
 
-    - name: Deploy to EC2 using SSM
-      run: |
-        INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=albertclo.com" --query "Reservations[].Instances[].InstanceId" --output text)
-        aws ssm send-command \
-          --instance-ids $INSTANCE_ID \
-          --document-name "AWS-RunShellScript" \
-          --comment "Deploy latest changes" \
-          --parameters commands=[
-            "cd /opt/albertclo.com",
-            "touch test1"
-          ] \
-          --output text
+          working-directory: /home/ubuntu/application
+          command: ls -al
+          comment: Hello world!
 
-    - name: Wait for deployment to complete
-      run: sleep 60
+      # Catch SSM outputs
+      - name: Get the outputs
+        run: echo "The Command id is ${{ steps.ssm.outputs.command-id }}"
