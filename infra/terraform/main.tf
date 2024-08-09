@@ -263,55 +263,10 @@ resource "aws_instance" "albertclo_com" {
     })
 }
 
-# Creates an IAM role for EC2 instances to access SSM
-resource "aws_iam_role" "albert_clo_ec2_ssm_role" {
-    name = "albert_clo_ec2_ssm_role"
-
-    assume_role_policy = jsonencode({
-        Version   = "2012-10-17"
-        Statement = [
-            {
-                Action = "sts:AssumeRole"
-                Effect = "Allow"
-                Principal = {
-                    Service = "ec2.amazonaws.com"
-                }
-            }
-        ]
-    })
-}
-
 # Retrieves information about the current AWS account
 data "aws_caller_identity" "current" {}
 
-# Attaches a policy to the EC2 role to allow access to the GitHub deploy key in SSM
-resource "aws_iam_role_policy" "ssm_albertclo_github_deploy_key" {
-    name = "ssm_albertclo_github_deploy_key"
-    role = aws_iam_role.albert_clo_ec2_ssm_role.id
-
-    policy = jsonencode({
-        Version   = "2012-10-17"
-        Statement = [
-            {
-                Effect = "Allow"
-                Action = [
-                    "ssm:GetParameter"
-                ]
-                Resource = [
-                    "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/albertclo/github_deploy_key"
-                ]
-            }
-        ]
-    })
-}
-
-# Creates an IAM instance profile for EC2 instances
-resource "aws_iam_instance_profile" "albert_clo_ec2_profile" {
-    name = "albert_clo_ec2_ec2_ssm_profile"
-    role = aws_iam_role.albert_clo_ec2_ssm_role.name
-}
-
-# Generates a private key for GitHub deployment
+# Generates a private key. Used as a GitHub deploy key for the albertclo.com repository.
 resource "tls_private_key" "albertclo_github_deploy_key" {
     algorithm = "RSA"
     rsa_bits  = 4096
