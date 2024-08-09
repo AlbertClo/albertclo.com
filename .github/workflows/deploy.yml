@@ -23,16 +23,17 @@ jobs:
 
                   working-directory: /home/ec2-user
                   command: |
-                      sudo mkdir -p /opt/albertclo.com
-                      cd /opt/albertclo.com
-                      sudo chown -R ec2-user:ec2-user .
+                      set -e
+                      sudo mkdir -p /opt/albertclo.com && \
+                      cd /opt/albertclo.com && \
+                      sudo chown -R ec2-user:ec2-user . && \
                       if [ ! -d .git ]; then
                           git clone https://github.com/AlbertClo/albertclo.com .
-                      fi
-                      git reset HEAD --hard
-                      git checkout main
-                      git fetch origin
-                      git reset --hard origin/main
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
+                      fi && \
+                      git reset HEAD --hard && \
+                      git checkout main && \
+                      git fetch origin && \
+                      git reset --hard origin/main && \
+                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate && \
+                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install && \
                       docker-compose --env-file .env -f infra/docker/docker-compose.yml exec node npm run build
