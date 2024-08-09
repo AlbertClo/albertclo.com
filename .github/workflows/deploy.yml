@@ -18,22 +18,22 @@ jobs:
       - name: Send SSM Command
         run: |
           aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=${{ secrets.INSTANCE_ID }}" \
-            --parameters '{
-              "commands": [
-                "export HOME=/home/ec2-user",
-                "sudo mkdir -p /opt/albertclo.com",
-                "sudo chown -R ec2-user:ec2-user /opt/albertclo.com",
-                "cd /opt/albertclo.com",
-                "if [ ! -d .git ]; then git clone https://github.com/AlbertClo/albertclo.com.git .; fi",
-                "git config --global --add safe.directory /opt/albertclo.com",
-                "git remote set-url origin https://github.com/AlbertClo/albertclo.com.git",
-                "git add -A && git reset HEAD --hard",
-                "git checkout main",
-                "git fetch origin",
-                "git reset --hard origin/main",
-                "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate",
-                "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install"
-              ]
-            }'
+              --document-name "AWS-RunShellScript" \
+              --targets "Key=instanceids,Values=${{ secrets.INSTANCE_ID }}" \
+              --parameters '{
+                "commands": [
+                  "export HOME=/home/ec2-user",
+                  "sudo mkdir -p /opt/albertclo.com",
+                  "sudo chown -R ec2-user:ec2-user /opt/albertclo.com",
+                  "cd /opt/albertclo.com",
+                  "if [ ! -d .git ]; then git clone https://github.com/AlbertClo/albertclo.com.git .; fi",
+                  "git config --global --add safe.directory /opt/albertclo.com",
+                  "git remote set-url origin https://github.com/AlbertClo/albertclo.com.git",
+                  "git add -A && git reset HEAD --hard",
+                  "git checkout main",
+                  "git fetch origin",
+                  "git reset --hard origin/main",
+                  "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate",
+                  "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install"
+                ]
+              }'
