@@ -4,47 +4,34 @@ on:
         branches:
             - main
 jobs:
-    start:
+    send-ssm-command:
         runs-on: ubuntu-latest
+
         steps:
-            - name: AWS SSM Send-Command
-              uses: nohmad/aws-ssm-send-command-action@master
-              id: ssm
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ secrets.AWS_REGION }}
-                  targets: |
-                      [{"Key":"InstanceIds","Values":["${{ secrets.INSTANCE_ID }}"]}]
-                  document-name: AWS-RunShellScript
-                  parameters: |
-                      {
-                        "commands": [
-                          "set -e",
-                          "export HOME=/home/ec2-user",
-                          "sudo mkdir -p /opt/albertclo.com",
-                          "sudo chown -R ec2-user:ec2-user /opt/albertclo.com",
-                          "cd /opt/albertclo.com",
-                          "if [ ! -d .git ]; then git clone https://github.com/AlbertClo/albertclo.com.git .; fi",
-                          "git config --global --add safe.directory /opt/albertclo.com",
-                          "git remote set-url origin https://github.com/AlbertClo/albertclo.com.git",
-                          "git add -A && git reset HEAD --hard",
-                          "git checkout main",
-                          "git fetch origin",
-                          "git reset --hard origin/main",
-                          "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate",
-                          "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install",
-                          "touch deploy-finished-at $(date)",
-                          "echo 'All commands completed successfully'"
-                        ]
-                      }
-            - name: Check SSM command status
-              run: |
-                if [[ "${{ steps.ssm.outputs.status }}" == "Success" ]]; then
-                  echo "SSM command executed successfully"
-                  echo "Command output: ${{ steps.ssm.outputs.output }}"
-                else
-                  echo "SSM command failed"
-                  echo "Command output: ${{ steps.ssm.outputs.output }}"
-                  exit 1
-                fi
+            name: Checkout code
+                  uses: actions/checkout@v2
+
+                - name: Configure AWS credentials
+                  uses: aws-actions/configure-aws-credentials@v1
+                  with:
+                    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                    aws-region: us-east-1  # Replace with your AWS region
+
+                - name: Send SSM Command
+                  run: |
+                      export HOME=/home/ec2-user
+                      sudo mkdir -p /opt/albertclo.com && \
+                      sudo chown -R ec2-user:ec2-user /opt/albertclo.com && \
+                      cd /opt/albertclo.com && \
+                      if [ ! -d .git ]; then
+                          git clone https://github.com/AlbertClo/albertclo.com.git .
+                      fi && \
+                      git config --global --add safe.directory /opt/albertclo.com && \
+                      git remote set-url origin https://github.com/AlbertClo/albertclo.com.git && \
+                      git add -A && git reset HEAD --hard && \
+                      git checkout main && \
+                      git fetch origin && \
+                      git reset --hard origin/main && \
+                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate && \
+                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
