@@ -19,7 +19,7 @@ jobs:
         run: |
           aws ssm send-command \
               --document-name "AWS-RunShellScript" \
-              --instance-ids "${{ secrets.INSTANCE_ID }}" \
+              --targets "Key=instanceids,Values=i-0f00f008a2dcbefe2" \
               --parameters '{
                 "commands": [
                   "export HOME=/home/ec2-user",
