@@ -21,14 +21,16 @@ jobs:
 
                   working-directory: /home/ec2-user
                   command: |
-                      set -e
+                      export HOME=/home/ec2-user
                       sudo mkdir -p /opt/albertclo.com && \
+                      sudo chown -R ec2-user:ec2-user /opt/albertclo.com && \
                       cd /opt/albertclo.com && \
-                      sudo chown -R ec2-user:ec2-user . && \
                       if [ ! -d .git ]; then
-                          git clone https://github.com/AlbertClo/albertclo.com .
+                          git clone https://github.com/AlbertClo/albertclo.com.git .
                       fi && \
-                      git reset HEAD --hard && \
+                      git config --global --add safe.directory /opt/albertclo.com && \
+                      git remote set-url origin https://github.com/AlbertClo/albertclo.com.git && \
+                      git add -A && git reset HEAD --hard && \
                       git checkout main && \
                       git fetch origin && \
                       git reset --hard origin/main && \
