@@ -22,7 +22,7 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=YourEC2InstanceTagName" \
+            --targets "Key=tag:Name,Values=${{ secrets.INSTANCE_ID }}" \
             --parameters '{
               "commands": [
                 "export HOME=/home/ec2-user",
