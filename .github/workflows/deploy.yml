@@ -32,7 +32,7 @@ jobs:
                           "git fetch origin",
                           "git reset --hard origin/main",
                           "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate",
-                          "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install"
+                          "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install",
                           "touch deploy-finished-at $(date)"
                         ]
                       }
