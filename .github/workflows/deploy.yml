@@ -10,19 +10,18 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v1
+            - name: AWS SSM Send-Command
+              uses: peterkimzz/aws-ssm-send-command@master
+              id: ssm
               with:
+                  aws-region: ${{ secrets.AWS_REGION }}
                   aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
                   aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ secrets.AWS_REGION }}
+                  instance-ids: ${{ secrets.INSTANCE_ID }}
 
-            - name: AWS SSM Send-Command
-              run: |
-                  COMMAND_ID=$(aws ssm send-command \
-                    --instance-ids "${{ secrets.INSTANCE_ID }}" \
-                    --document-name "AWS-RunShellScript" \
-                    --parameters '{"commands":["
+                  working-directory: /home/ec2-user
+                  command: |
+                      bash -c "
                       set -e
                       export HOME=/home/ec2-user
                       sudo mkdir -p /opt/albertclo.com
@@ -39,32 +38,23 @@ jobs:
                       git reset --hard origin/main
                       docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
                       docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec node npm run build
-                    "]}' \
-                    --output text \
-                    --query "Command.CommandId")
-                  echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
+                      "
 
-            - name: Wait for SSM command to complete
+            - name: Check SSM Command Status
               run: |
-                  COMMAND_ID=${{ steps.ssm.outputs.command_id }}
-                  while true; do
-                    STATUS=$(aws ssm list-commands \
-                      --command-id "$COMMAND_ID" \
-                      --query "Commands[0].Status" \
-                      --output text)
-                    if [ "$STATUS" = "Success" ]; then
-                      echo "Command completed successfully"
-                      break
-                    elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-                      echo "Command failed with status: $STATUS"
-                      aws ssm get-command-invocation \
-                        --command-id "$COMMAND_ID" \
-                        --instance-id "${{ secrets.INSTANCE_ID }}" \
-                        --query "StandardOutputContent" \
-                        --output text
-                      exit 1
-                    fi
-                    echo "Waiting for command to complete. Current status: $STATUS"
-                    sleep 10
-                  done
+                  if [ "${{ steps.ssm.outputs.command-id }}" == "" ]; then
+                    echo "SSM command failed to start"
+                    exit 1
+                  fi
+
+                  response=$(aws ssm get-command-invocation --command-id ${{ steps.ssm.outputs.command-id }} --instance-id ${{ secrets.INSTANCE_ID }} --region ${{ secrets.AWS_REGION }})
+                  status=$(echo $response | jq -r .Status)
+
+                  if [ "$status" != "Success" ]; then
+                    echo "SSM command failed with status: $status"
+                    echo "Command output:"
+                    echo $response | jq -r .StandardOutputContent
+                    echo "Error output:"
+                    echo $response | jq -r .StandardErrorContent
+                    exit 1
+                  fi
