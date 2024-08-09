@@ -1,14 +1,11 @@
 name: Deploy to EC2
-
 on:
     push:
         branches:
             - main
-
 jobs:
     start:
         runs-on: ubuntu-latest
-
         steps:
             - name: AWS SSM Send-Command
               uses: peterkimzz/aws-ssm-send-command@master
@@ -21,40 +18,18 @@ jobs:
 
                   working-directory: /home/ec2-user
                   command: |
-                      bash -c "
-                      set -e
                       export HOME=/home/ec2-user
-                      sudo mkdir -p /opt/albertclo.com
-                      sudo chown -R ec2-user:ec2-user /opt/albertclo.com
-                      cd /opt/albertclo.com
+                      sudo mkdir -p /opt/albertclo.com && \
+                      sudo chown -R ec2-user:ec2-user /opt/albertclo.com && \
+                      cd /opt/albertclo.com && \
                       if [ ! -d .git ]; then
                           git clone https://github.com/AlbertClo/albertclo.com.git .
-                      fi
-                      git config --global --add safe.directory /opt/albertclo.com
-                      git remote set-url origin https://github.com/AlbertClo/albertclo.com.git
-                      git add -A && git reset HEAD --hard
-                      git checkout main
-                      git fetch origin
-                      git reset --hard origin/main
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
+                      fi && \
+                      git config --global --add safe.directory /opt/albertclo.com && \
+                      git remote set-url origin https://github.com/AlbertClo/albertclo.com.git && \
+                      git add -A && git reset HEAD --hard && \
+                      git checkout main && \
+                      git fetch origin && \
+                      git reset --hard origin/main && \
+                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate && \
                       docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
-                      "
-
-            - name: Check SSM Command Status
-              run: |
-                  if [ "${{ steps.ssm.outputs.command-id }}" == "" ]; then
-                    echo "SSM command failed to start"
-                    exit 1
-                  fi
-
-                  response=$(aws ssm get-command-invocation --command-id ${{ steps.ssm.outputs.command-id }} --instance-id ${{ secrets.INSTANCE_ID }} --region ${{ secrets.AWS_REGION }})
-                  status=$(echo $response | jq -r .Status)
-
-                  if [ "$status" != "Success" ]; then
-                    echo "SSM command failed with status: $status"
-                    echo "Command output:"
-                    echo $response | jq -r .StandardOutputContent
-                    echo "Error output:"
-                    echo $response | jq -r .StandardErrorContent
-                    exit 1
-                  fi
