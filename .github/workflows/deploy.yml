@@ -20,6 +20,7 @@ jobs:
                   parameters: |
                       {
                         "commands": [
+                          "set -e",
                           "export HOME=/home/ec2-user",
                           "sudo mkdir -p /opt/albertclo.com",
                           "sudo chown -R ec2-user:ec2-user /opt/albertclo.com",
@@ -33,6 +34,17 @@ jobs:
                           "git reset --hard origin/main",
                           "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate",
                           "docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install",
-                          "touch deploy-finished-at $(date)"
+                          "touch deploy-finished-at $(date)",
+                          "echo 'All commands completed successfully'"
                         ]
                       }
+            - name: Check SSM command status
+              run: |
+                if [[ "${{ steps.ssm.outputs.status }}" == "Success" ]]; then
+                  echo "SSM command executed successfully"
+                  echo "Command output: ${{ steps.ssm.outputs.output }}"
+                else
+                  echo "SSM command failed"
+                  echo "Command output: ${{ steps.ssm.outputs.output }}"
+                  exit 1
+                fi
