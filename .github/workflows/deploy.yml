@@ -19,6 +19,7 @@ jobs:
         HOST: ec2-user@${{ secrets.AWS_INSTANCE_IP }}
       run: |
         ssh -i StrictHostKeyChecking=accept-new ec2-user@${{ secrets.AWS_INSTANCE_IP }} "
+
           # `set -e` stops the execution of the script if a command or pipeline has an error. We need this to make sure
           # the GitHub Action reports a failure if something goes wrong.
           set -e
