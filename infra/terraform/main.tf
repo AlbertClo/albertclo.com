@@ -68,16 +68,6 @@ resource "aws_subnet" "albertclo_subnet" {
     })
 }
 
-# Creates an SSH key pair for accessing EC2 instances
-resource "aws_key_pair" "albert_ssh_key" {
-    key_name   = "albert_ssh_key"
-    public_key = file("public_keys/albert_id_rsa.pub")
-
-    tags = merge(local.common_tags, {
-        Name = "albert_ssh_key"
-    })
-}
-
 # Generates an IAM user and access key for GitHub Actions
 resource "aws_iam_user" "albertclo_github_actions_user" {
     name = "albertclo-github-actions"
@@ -151,12 +141,14 @@ resource "aws_security_group" "albertclo_com_sec_group" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
+    # We need ssh access from the GitHub Actions runner, so we can't limit the IP address ranges easily.
+    # todo: Install and configure fail2ban. Change ssh port to a non-standard port. Use SSH key authentication only (no password authentication)
     ingress {
-        description = "SSH from personal IPs"
+        description = "SSH access IPs"
         from_port   = 22
         to_port     = 22
         protocol    = "tcp"
-        cidr_blocks = ["197.245.68.172/32"]
+        cidr_blocks = ["0.0.0.0/0"]
     }
 
     egress {
@@ -179,6 +171,32 @@ data "aws_ssm_parameter" "amzn2_ami" {
 # Retrieves information about the current AWS region
 data "aws_region" "current" {}
 
+# Albert's SSH public key for accessing EC2 instances
+resource "aws_key_pair" "albert_ssh_key" {
+    key_name   = "albert_ssh_key"
+    public_key = file("public_keys/albert_id_rsa.pub")
+
+    tags = merge(local.common_tags, {
+        Name = "albert_ssh_key"
+    })
+}
+
+# This private key will be added on the GitHub repo so that the GitHub action can use it to ssh into the EC2 instance
+resource "tls_private_key" "github_action_ssh_key" {
+    algorithm = "RSA"
+    rsa_bits  = 4096
+}
+
+# Create a new AWS key pair using the public key
+resource "aws_key_pair" "github_action_ssh_key" {
+    key_name   = "github_action_ssh_key"
+    public_key = tls_private_key.github_action_ssh_key.public_key_openssh
+
+    tags = merge(local.common_tags, {
+        Name = "github_action_ssh_key"
+    })
+}
+
 # Creates an EC2 instance for hosting albertclo.com
 resource "aws_instance" "albertclo_com" {
     ami           = data.aws_ssm_parameter.amzn2_ami.value
@@ -200,10 +218,11 @@ resource "aws_instance" "albertclo_com" {
         })
     }
 
-    iam_instance_profile = aws_iam_instance_profile.albert_clo_ec2_profile.name
-
     user_data = <<-EOF
                 #!/bin/bash
+
+                # Add the new public key to authorized_keys
+                echo "${tls_private_key.github_action_ssh_key.public_key_openssh}" >> /home/ec2-user/.ssh/authorized_keys
 
                 # Install required software
                 sudo yum update -y
@@ -291,91 +310,6 @@ resource "aws_ssm_parameter" "albertclo_github_deploy_key" {
     })
 }
 
-variable "github_repo" {
-    description = "GitHub repository in the format owner/repo"
-    type        = string
-    default     = "AlbertClo/albertclo.com"
-}
-
-# Creates an IAM role for GitHub Actions to assume for deployments
-resource "aws_iam_role" "albertclo_github_actions_role" {
-    name = "albertclo-github-actions-deploy-role"
-
-    assume_role_policy = jsonencode({
-        Version   = "2012-10-17"
-        Statement = [
-            {
-                Action = "sts:AssumeRole"
-                Effect = "Allow"
-                Principal = {
-                    Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-                }
-                Condition = {
-                    StringLike = {
-                        "token.actions.githubusercontent.com:sub" : "repo:${var.github_repo}:*"
-                    }
-                }
-            }
-        ]
-    })
-}
-
-# Attaches a policy to the GitHub Actions role to allow deployments
-resource "aws_iam_role_policy" "albertclo_github_actions_policy" {
-    name = "albertclo-github-actions-deploy-policy"
-    role = aws_iam_role.albertclo_github_actions_role.id
-
-    policy = jsonencode({
-        "Version" : "2012-10-17",
-        "Statement" : [
-            {
-                "Action" : [
-                    "ec2:DescribeInstances",
-                    "ec2:DescribeRegions",
-                    "sts:GetCallerIdentity",
-                    "sts:AssumeRole"
-                ],
-                "Effect" : "Allow",
-                "Resource" : "*"
-            },
-            {
-                "Action" : [
-                    "ssm:SendCommand"
-                ],
-                "Condition" : {
-                    "StringLike" : {
-                        "ssm:ResourceTag/Name" : "albertclo.com"
-                    }
-                },
-                "Effect" : "Allow",
-                Resource = [
-                    "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*"
-                ]
-            },
-            {
-                "Action" : [
-                    "ssm:SendCommand"
-                ],
-                "Effect" : "Allow",
-                "Resource" : [
-                    "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:document/AWS-RunShellScript"
-                ]
-            }
-        ]
-    })
-}
-
-# Attaches the SSM Managed Instance Core policy to the EC2 role
-resource "aws_iam_role_policy_attachment" "ssm_policy" {
-    policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-    role       = aws_iam_role.albert_clo_ec2_ssm_role.name
-}
-
-# Outputs the ARN of the GitHub Actions role
-output "albertclo_github_actions_role_arn" {
-    value = aws_iam_role.albertclo_github_actions_role.arn
-}
-
 # Outputs the public IP address of the EC2 instance
 output "instance_public_ip" {
     description = "Public IP address of the EC2 instance"
@@ -394,17 +328,14 @@ output "github_public_key" {
     value       = tls_private_key.albertclo_github_deploy_key.public_key_openssh
 }
 
-# Outputs the access key for GitHub Actions
-output "github_actions_access_key" {
-    description = "Access key for GitHub Actions"
-    value       = aws_iam_access_key.albertclo_github_actions_access_key.id
+# Outputs the private key for GitHub Actions
+# This output is sensitive. To view this output, run `terraform output github_action_ssh_private_key`
+output "github_action_ssh_private_key" {
+    value     = tls_private_key.github_action_ssh_key.private_key_pem
+    sensitive = true
 }
 
-# Outputs the secret key for GitHub Actions
-# This output is sensitive. To view this output, run `terraform output github_actions_secret_key`
-output "github_actions_secret_key" {
-    description = "Secret key for GitHub Actions"
-    value       = aws_iam_access_key.albertclo_github_actions_access_key.secret
-    sensitive   = true
+# Output the public key
+output "github_action_ssh_public_key" {
+    value = tls_private_key.github_action_ssh_key.public_key_openssh
 }
-

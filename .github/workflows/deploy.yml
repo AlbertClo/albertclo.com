@@ -1,38 +1,46 @@
 name: Deploy to EC2
-
 on:
-    push:
-        branches:
-            - main
-
+  push:
+    branches:
+      - main
 jobs:
-    start:
-        runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v2
+    steps:
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.AWS_INSTANCE_SSH_PRIVATE_KEY }}
+        known_hosts: ${{ secrets.KNOWN_HOSTS }}
 
-            - name: AWS SSM Send-Command
-              uses: peterkimzz/aws-ssm-send-command@master
-              id: ssm
-              with:
-                  aws-region: ${{ secrets.AWS_REGION }}
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  instance-ids: ${{ secrets.INSTANCE_ID }}
+    - name: Deploy to EC2
+      env:
+        HOST: ec2-user@${{ secrets.AWS_INSTANCE_IP }}
+      run: |
+        ssh -i StrictHostKeyChecking=accept-new ec2-user@${{ secrets.AWS_INSTANCE_IP }} "
+          # `set -e` stops the execution of the script if a command or pipeline has an error. We need this to make sure
+          # the GitHub Action reports a failure if something goes wrong.
+          set -e
 
-                  working-directory: /home/ec2-user
-                  command: |
-                      sudo mkdir -p /opt/albertclo.com
-                      cd /opt/albertclo.com
-                      sudo chown -R ec2-user:ec2-user .
-                      if [ ! -d .git ]; then
-                          git clone https://github.com/AlbertClo/albertclo.com .
-                      fi
-                      git reset HEAD --hard
-                      git checkout main
-                      git fetch origin
-                      git reset --hard origin/main
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
-                      docker-compose --env-file .env -f infra/docker/docker-compose.yml exec node npm run build
+          # Make sure the latest commit from the main branch is checked out
+          sudo mkdir -p /opt/albertclo.com
+          sudo chown -R ec2-user:ec2-user /opt/albertclo.com
+          cd /opt/albertclo.com
+          if [ ! -d .git ]; then git clone https://github.com/AlbertClo/albertclo.com.git . ; fi
+          git config --global --add safe.directory /opt/albertclo.com
+          git remote set-url origin https://github.com/AlbertClo/albertclo.com.git
+          git add -A
+          git reset HEAD --hard
+          git checkout main
+          git fetch origin
+          git reset --hard origin/main
+
+          # Run the docker containers
+          docker-compose --env-file .env -f infra/docker/docker-compose.yml up -d
+
+          # Run build commands
+          docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
+          docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
+
+          echo 'done'"
