@@ -14,7 +14,7 @@ We use Docker to run PHP, Nginx, and Postgres.
 To run a command in the PHP container:
 
 ```shell
-docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php [command]
+docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php [command]e
 ```
 e.g.:
 ```shell
