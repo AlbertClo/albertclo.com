@@ -3,6 +3,7 @@
 import Heading2 from "@/Pages/CambridgeBrainPacer/Heading2.vue";
 import Heading3 from "@/Pages/CambridgeBrainPacer/Heading3.vue";
 import HeroAnimation from "@/Pages/CambridgeBrainPacer/HeroAnimation.vue";
+import { Head } from '@inertiajs/vue3'
 
 defineProps<{}>();
 
@@ -209,6 +210,10 @@ const teamMembers: TeamMember[] = [
 </script>
 
 <template>
+    <Head>
+        <title>Brain-PACER</title>
+        <meta name="description" content="Deep Brain Stimulation for Addiction Treatment">
+    </Head>
     <div class="w-full flex flex-row justify-center bg-slate-50 text-slate-500 text-lg px-2 leading-loose">
         <div class="max-w-[60rem] flex flex-col gap-4 mt-6 lg:mt-20 z-10">
             <div class="grid grid-cols-1 lg:grid-cols-2">
