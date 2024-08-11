@@ -533,8 +533,8 @@ const teamMembers: TeamMember[] = [
                                 </div>
                             </div>
                             <div class="flex-col grow">
-                                <div class="mt-[-3px] text-slate-800 text-sm lg:text-lg">{{ teamMember.name }}
-                                    <template v-for="credential in teamMember.credentials">, {{ credential }}</template>
+                                <div class="mt-[-3px] text-slate-800 text-sm lg:text-lg">
+                                    {{ teamMember.name }}<template v-for="credential in teamMember.credentials">, {{ credential }}</template>
                                 </div>
                                 <div v-for="position in teamMember.positions" class="text-slate-400 text-xs lg:text-sm">
                                     {{
