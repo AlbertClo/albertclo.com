@@ -43,5 +43,6 @@ jobs:
           # Run build commands
           docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php composer install
           docker-compose --env-file .env -f infra/docker/docker-compose.yml exec php php artisan migrate
+          docker-compose --env-file .env -f infra/docker/docker-compose.yml exec node npm run build
 
           echo 'done'"
