@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\CambridgeBrainPacerController;
+use App\Http\Controllers\NachiController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/cambridge/brain-pacer', [CambridgeBrainPacerController::class, 'home'])->name('profile.edit');
+Route::get('/cambridge/brain-pacer', [CambridgeBrainPacerController::class, 'home'])->name('cambridge.brain-pacer');
+Route::get('/nachi/benefits', [NachiController::class, 'benefits'])->name('nachi.benefits');
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
