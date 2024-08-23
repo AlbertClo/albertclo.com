@@ -18,6 +18,8 @@
 </head>
 <body class="font-sans antialiased">
 
+@if(($_COOKIE['password'] ?? '') === 'nachi')
+
 <div x-data="benefitsPresenter()"
      class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-5xl p-6">
     <div>
@@ -68,15 +70,37 @@
                               :key="index">
                         <div>
 
+                            <template x-if="benefit.media_type == 'Document'">
+                                <div class="flex flex-row rounded shadow p-3 gap-4">
+                                    <div>
+                                        <div class="rounded-full bg-indigo-300 size-8 flex flex-row justify-center items-center">
+                                            <div class="fa fa-newspaper text-white"></div>
+                                        </div>
+                                    </div>
+                                    <div class="border-l-slate-200 border-l-2 pl-5">
+                                        <a :href="benefit.url" x-text="benefit.title" class="text-slate-700 text-lg"></a>
+                                    </div>
+                                </div>
+                            </template>
+
                             <template x-if="benefit.media_type == 'Video'">
-                                <a :href="benefit.url" x-text="benefit.title" class="text-yellow-300 text-lg"></a>
+                                <div class="flex flex-row rounded shadow p-3 gap-4">
+                                    <div>
+                                        <div class="rounded-full bg-red-500 size-8 flex flex-row justify-center items-center">
+                                            <div class="fa fa-play text-white"></div>
+                                        </div>
+                                    </div>
+                                    <div class="border-l-slate-200 border-l-2 pl-5">
+                                        <a :href="benefit.url" x-text="benefit.title" class="text-slate-700 text-lg"></a>
+                                    </div>
+                                </div>
                             </template>
 
                             <template x-if="benefit.media_type == 'Tagline'">
                                 <div x-text="benefit.title" class="text-lg"></div>
                             </template>
 
-                            <template x-if="benefit.media_type != 'Tagline' && benefit.media_type != 'Video'">
+                            <template x-if="benefit.media_type != 'Tagline' && benefit.media_type != 'Video' && benefit.media_type != 'Document'">
                                 <a :href="benefit.url" x-text="benefit.title" class="text-blue-700 text-lg hover:underline" target="_blank"></a>
                             </template>
                         </div>
@@ -86,6 +110,35 @@
         </div>
     </div>
 </div>
+@else
+    <div class="flex items-center justify-center h-screen gap-4">
+        Password
+        <input type="password" x-model="password"  id="passwordInput">
+    </div>
+    <script>
+        const passwordInput = document.getElementById('passwordInput');
+
+        passwordInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                submitPassword();
+            }
+        });
+
+        const handleKeyUp = (event) => {
+            if (event.key === 'Enter') {
+                submitPassword();
+            }
+        }
+        const submitPassword = () => {
+            console.log('submitPassword')
+            const password = passwordInput.value;
+            document.cookie = "password=" + passwordInput.value + "; path=/";
+            location.reload();
+        }
+    </script>
+@endif
+
+
 
 <script>
     const benefitsList = [
@@ -98,6 +151,16 @@
             "free": true,
             "featured": false,
             "media_type": "Document"
+        },
+        {
+            "title": "Video Test",
+            "description": "Download our comprehensive Membership Guide.",
+            "category": "About InterNACHI®",
+            "subcategory": "",
+            "url": "https://www.nachi.org/guide",
+            "free": true,
+            "featured": false,
+            "media_type": "Video"
         },
         {
             "title": "Meet our staff",
